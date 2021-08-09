@@ -1,27 +1,39 @@
+##tanks dataindustry from hwinfo forum https://www.hwinfo.com/forum/threads/python-code-for-fetch-data-from-hwinfo.7247/
+##for struct and example of read shared memory from hwinfo
+
 import struct
 import time
 import psutil
-
 import sys
-
-try:
-    file_dir = sys.argv[1]
-except IndexError:
-    file_dir = "log.csv"
+import logging
 
 from multiprocessing import shared_memory
 from construct import Struct, Int32un, Long
 
+
+logging.basicConfig(filename='hw.log',
+                    format='%(asctime)s %(levelname)-8s %(message)s',
+                    level=logging.INFO,
+                    datefmt='%Y-%m-%d %H:%M:%S')
+logging.info("Started")
+
+try:
+    file_dir = sys.argv[1]
+except IndexError:
+    file_dir = "hw_log.csv"
+
 while "HWiNFO64.exe" not in (p.name() for p in psutil.process_iter()):
-    print("Waiting forHWiNFO64.exe")
+    logging.info("Waiting forHWiNFO64.exe")
     time.sleep(1)
+
 loop = True
 while loop:
     try:
         memory = shared_memory.SharedMemory('Global\\HWiNFO_SENS_SM2')
+        logging.info("Successful read Global\\HWiNFO_SENS_SM2")
         loop = False
     except Exception:
-        print("Can't read Global\\HWiNFO_SENS_SM2")
+        logging.info("Can't read Global\\HWiNFO_SENS_SM2")
         time.sleep(1)
 
 sensor_element_struct = Struct(
@@ -46,7 +58,9 @@ offset = sensor_element.dwOffsetOfReadingSection
 length = sensor_element.dwSizeOfReadingElement
 
 try:
+    logging.info("Opening file " + file_dir)
     f = open(file_dir, "x")
+    logging.info("file " + file_dir + " created")
     for index in range(sensor_element.dwNumReadingElements):
         if index == 0:
             f.write("Date time,")
@@ -58,9 +72,10 @@ try:
     f.write("\n")
     f.close()
 except Exception:
-    print("File exists")
+    logging.info("file " + file_dir + " exists")
 
 f = open(file_dir, "a")
+logging.info("file " + file_dir + " opened")
 
 loop = True
 while loop:
@@ -73,6 +88,8 @@ while loop:
         time.sleep(1)
         f.write("\n")
     except Exception:
+        logging.info("hwi_logger stop")
+        logging.info(Exception)
         loop = False
 
 f.close()
