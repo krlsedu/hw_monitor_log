@@ -10,28 +10,37 @@ class SerialReader:
                             level=logging.INFO,
                             datefmt='%Y-%m-%d %H:%M:%S')
         self.ser = None
-        self.decoded_bytes = float(0)
+        self.decoded_bytes = str(0)
 
     def connect(self):
         try:
-            self.ser = serial.Serial('COM4', 9600, timeout=0)
+            self.ser = serial.Serial('COM3', 9600, timeout=0)
             loop = True
         except Exception as e:
             loop = False
             logging.info(str(e))
         while loop:
             try:
-                ser_bytes = self.ser.readline()
                 time.sleep(1)
-                self.decoded_bytes = float(ser_bytes[0:len(ser_bytes) - 2].decode("utf-8"))
+                self.ser.write("get".encode())
+                ser_bytes = self.ser.readline()
+                self.decoded_bytes = str(ser_bytes[0:len(ser_bytes) - 2].decode("utf-8"))
+                vs = self.decoded_bytes.split(",")
+                for v in vs:
+                    float(v)
                 loop = False
             except Exception as e:
                 logging.info(str(e))
 
     def read_serial(self):
         try:
+            self.ser.write("get".encode())
             ser_bytes = self.ser.readline()
-            self.decoded_bytes = float(ser_bytes[0:len(ser_bytes) - 2].decode("utf-8"))
+            temp = str(ser_bytes[0:len(ser_bytes) - 2].decode("utf-8"))
+            vs = temp.split(",")
+            for v in vs:
+                float(v)
+            self.decoded_bytes = temp
         except Exception as e:
             self.connect()
             logging.info(str(e))

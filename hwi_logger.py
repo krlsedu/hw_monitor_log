@@ -6,11 +6,15 @@ import time
 import psutil
 import sys
 import logging
+import requests
+import json
 
 from multiprocessing import shared_memory
 from construct import Struct, Int32un, Long
 
 from SerialReader import SerialReader
+
+api_url = "http://192.168.15.85:8088/api/v1/dados"
 
 try:
     file_dir = sys.argv[1]
@@ -58,45 +62,31 @@ reading_element_struct = struct.Struct(fmt)
 offset = sensor_element.dwOffsetOfReadingSection
 length = sensor_element.dwSizeOfReadingElement
 
-try:
-    logging.info("Opening file " + file_dir + "monitoring.csv")
-    f = open(file_dir + "monitoring.csv", "x")
-    logging.info("file " + file_dir + "monitoring.csv" + " created")
-    for index in range(sensor_element.dwNumReadingElements):
-        if index == 0:
-            f.write("Date time,")
-        reading = reading_element_struct.unpack(memory.buf[offset + index * length: offset + (index + 1) * length])
-        f.write(
-            str(reading[4].replace(b'\00', b'').decode('utf-8')) +
-            " " + str(reading[5].replace(b'\00', b'').decode('mbcs')) +
-            ",")
-    f.write("Temperature,")
-    f.write("\n")
-    f.close()
-except Exception:
-    logging.info("file " + file_dir + "monitoring.csv" + " exists")
-
-f = open(file_dir + "monitoring.csv", "a")
-logging.info("file " + file_dir + "monitoring.csv" + " opened")
-
 serial = SerialReader(file_dir)
 serial.connect()
 
 loop = True
 while loop:
     try:
+        cabecalho = ""
+        informacoes = ""
         for index in range(sensor_element.dwNumReadingElements):
             if index == 0:
-                f.write(time.strftime("%Y-%m-%dT%H:%M:%S%z", time.localtime()) + ",")
+                cabecalho += "Date time,Temperature,"
+                informacoes += time.strftime("%Y-%m-%dT%H:%M:%S%z", time.localtime()) + ","
+                informacoes += serial.read_serial() + ","
             reading = reading_element_struct.unpack(memory.buf[offset + index * length: offset + (index + 1) * length])
-            f.write(str(reading[6]) + ",")
-
-        f.write(serial.read_serial() + ",")
+            cabecalho += str(reading[4].replace(b'\00', b'').decode('utf-8')) + " " + str(
+                reading[5].replace(b'\00', b'').decode('mbcs')) + ","
+            informacoes += str(reading[6]) + ","
+        todo = {"cabecalho": cabecalho, "informacoes": informacoes}
+        headers = {"Content-Type": "application/json"}
+        try:
+            response = requests.post(api_url, data=json.dumps(todo), headers=headers)
+        except Exception as ex:
+            logging.error(str(e))
         time.sleep(1)
-        f.write("\n")
     except Exception as e:
         logging.info("hwi_logger stop")
-        logging.info(str(e))
+        logging.error(str(e))
         loop = False
-
-f.close()
